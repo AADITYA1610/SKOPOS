@@ -1,4 +1,14 @@
 import { useEffect, useRef, useState } from "react";
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { api } from "../api/client";
 import "./LiveStreamPage.css";
 
@@ -39,6 +49,7 @@ function getErrorMessage(error) {
   const detail = error.response?.data?.detail;
 
   if (typeof detail === "string") return detail;
+
   if (Array.isArray(detail)) {
     return detail.map((item) => item.msg).join("; ");
   }
@@ -54,6 +65,18 @@ function displayValue(value, unit) {
   return value == null ? "Missing" : `${value} ${unit}`;
 }
 
+function describeFlag(flag) {
+  if (flag.type === "missing_measurement") {
+    return `Missing ${flag.field}`;
+  }
+
+  if (flag.type === "outside_demo_range") {
+    return `${flag.field} outside range`;
+  }
+
+  return "Repeated event identity";
+}
+
 function LiveStreamPage() {
   const [source, setSource] = useState("demo");
   const [running, setRunning] = useState(false);
@@ -67,6 +90,7 @@ function LiveStreamPage() {
 
     const controller = new AbortController();
     controllerRef.current = controller;
+
     const { signal } = controller;
     const requestOptions = { signal, timeout: 10000 };
 
@@ -90,7 +114,6 @@ function LiveStreamPage() {
         setSession(created.data);
         setStatus("Running");
 
-        // Construct the same repeatable sequence as the Python simulator.
         const events = [];
 
         MEASUREMENTS.forEach(([temperature, humidity], index) => {
@@ -140,6 +163,7 @@ function LiveStreamPage() {
           );
 
           if (signal.aborted) return;
+
           setSession(latest.data);
 
           if (index < events.length - 1) {
@@ -164,6 +188,7 @@ function LiveStreamPage() {
 
     return () => {
       controller.abort();
+
       if (controllerRef.current === controller) {
         controllerRef.current = null;
       }
@@ -185,6 +210,7 @@ function LiveStreamPage() {
 
   const quality = session?.quality_summary;
   const readings = session?.readings ?? [];
+
   const missingCount = Object.values(
     quality?.missing_counts ?? {}
   ).reduce((total, count) => total + count, 0);
@@ -192,6 +218,12 @@ function LiveStreamPage() {
   const rangeCount = Object.values(
     quality?.out_of_range_counts ?? {}
   ).reduce((total, count) => total + count, 0);
+
+  // Arrival numbers remain distinct even when event IDs repeat.
+  const chartData = readings.map((reading, index) => ({
+    ...reading,
+    arrival: session.total_received - readings.length + index + 1,
+  }));
 
   const sources = [
     { id: "demo", label: "Demo stream", detail: "Available" },
@@ -300,6 +332,44 @@ function LiveStreamPage() {
             />
           </div>
 
+          {readings.length > 0 && (
+            <section className="card section">
+              <h2 className="card__title">Live measurement charts</h2>
+              <p className="stream-description">
+                Horizontal axis: arrival number. Missing measurements
+                create gaps. Dashed lines show the monitoring limits.
+                Values outside those limits remain visible.
+              </p>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns:
+                    "repeat(auto-fit, minmax(min(100%, 340px), 1fr))",
+                  gap: "24px",
+                }}
+              >
+                <MeasurementChart
+                  data={chartData}
+                  field="temperature"
+                  title="Temperature (°C)"
+                  unit="°C"
+                  color="#22c9ed"
+                  limits={quality?.demo_ranges?.temperature}
+                />
+
+                <MeasurementChart
+                  data={chartData}
+                  field="humidity"
+                  title="Humidity (%)"
+                  unit="%"
+                  color="#a78bfa"
+                  limits={quality?.demo_ranges?.humidity}
+                />
+              </div>
+            </section>
+          )}
+
           <section className="card section">
             <h2 className="card__title">Recent readings</h2>
             <p className="stream-description">
@@ -319,6 +389,7 @@ function LiveStreamPage() {
                     <th>Checks</th>
                   </tr>
                 </thead>
+
                 <tbody>
                   {readings.map((reading, index) => {
                     const issue = quality?.issues?.find(
@@ -339,15 +410,7 @@ function LiveStreamPage() {
                         <td>{displayValue(reading.humidity, "%")}</td>
                         <td>
                           {issue
-                            ? issue.flags.map((flag) => {
-                                if (flag.type === "missing_measurement") {
-                                  return `Missing ${flag.field}`;
-                                }
-                                if (flag.type === "outside_demo_range") {
-                                  return `${flag.field} outside range`;
-                                }
-                                return "Repeated event identity";
-                              }).join("; ")
+                            ? issue.flags.map(describeFlag).join("; ")
                             : "No rule violations"}
                         </td>
                       </tr>
@@ -373,6 +436,87 @@ function LiveStreamPage() {
         </p>
       )}
     </main>
+  );
+}
+
+function MeasurementChart({ data, field, title, unit, color, limits }) {
+  return (
+    <div style={{ minWidth: 0 }}>
+      <h3 style={{ color: "#e5edf6", marginBottom: "16px" }}>
+        {title}
+      </h3>
+
+      <div
+        role="img"
+        aria-label={`${title} by arrival number; exact values appear in the readings table`}
+        style={{ width: "100%", height: "280px" }}
+      >
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart
+            data={data}
+            margin={{ top: 20, right: 20, bottom: 20, left: 0 }}
+          >
+            <CartesianGrid stroke="#334155" strokeDasharray="3 3" />
+
+            <XAxis
+              dataKey="arrival"
+              stroke="#a5b5c9"
+              label={{
+                value: "Arrival number",
+                position: "insideBottom",
+                offset: -12,
+                fill: "#a5b5c9",
+              }}
+            />
+
+            <YAxis stroke="#a5b5c9" domain={["auto", "auto"]} />
+
+            <Tooltip
+              filterNull={false}
+              contentStyle={{
+                backgroundColor: "#101b2b",
+                border: "1px solid #475569",
+                borderRadius: "8px",
+                color: "#e5edf6",
+              }}
+              labelFormatter={(arrival) => `Arrival ${arrival}`}
+              formatter={(value) => [
+                value == null ? "Missing" : `${value} ${unit}`,
+                title,
+              ]}
+            />
+
+            {limits && (
+              <>
+                <ReferenceLine
+                  y={limits.min}
+                  stroke="#fbbf24"
+                  strokeDasharray="5 5"
+                  ifOverflow="extendDomain"
+                />
+                <ReferenceLine
+                  y={limits.max}
+                  stroke="#fbbf24"
+                  strokeDasharray="5 5"
+                  ifOverflow="extendDomain"
+                />
+              </>
+            )}
+
+            <Line
+              type="linear"
+              dataKey={field}
+              stroke={color}
+              strokeWidth={2}
+              dot={{ r: 4 }}
+              activeDot={{ r: 6 }}
+              connectNulls={false}
+              isAnimationActive={false}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
   );
 }
 
