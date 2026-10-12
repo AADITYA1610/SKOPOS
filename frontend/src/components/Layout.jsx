@@ -9,26 +9,23 @@ function Layout() {
   const { user, ready, logout, isAuthenticated } = useAuth();
   const [klausOpen, setKlausOpen] = useState(false);
 
+  function navClass({ isActive }) {
+    return `site-nav__link${isActive ? " active" : ""}`;
+  }
+
   return (
     <div className="app app--with-nav">
       <nav className="site-nav" aria-label="Main">
         <NavLink to="/" className="site-nav__brand">
-          LOOM
+          SKOPOS
         </NavLink>
 
         <div className="site-nav__links">
-          <NavLink
-            to="/"
-            end
-            className={({ isActive }) => `site-nav__link${isActive ? " active" : ""}`}
-          >
+          <NavLink to="/" end className={navClass}>
             Home
           </NavLink>
 
-          <NavLink
-            to="/analyze"
-            className={({ isActive }) => `site-nav__link${isActive ? " active" : ""}`}
-          >
+          <NavLink to="/analyze" className={navClass}>
             Analyze
           </NavLink>
 
@@ -40,36 +37,40 @@ function Layout() {
               }`
             }
             aria-disabled={!edaSummary}
-            onClick={(e) => {
-              if (!edaSummary) e.preventDefault();
+            onClick={(event) => {
+              if (!edaSummary) event.preventDefault();
             }}
           >
             Results
           </NavLink>
 
-          <NavLink
-            to="/visualize"
-            className={({ isActive }) => `site-nav__link${isActive ? " active" : ""}`}
-          >
+          <NavLink to="/visualize" className={navClass}>
             Visualize
           </NavLink>
 
-          <NavLink
-            to="/activity"
-            className={({ isActive }) => `site-nav__link${isActive ? " active" : ""}`}
-          >
+          <NavLink to="/streams" className={navClass}>
+            Live Stream
+          </NavLink>
+
+          <NavLink to="/activity" className={navClass}>
             Activity
           </NavLink>
         </div>
 
         <div className="site-nav__auth">
           {!ready ? (
-            <span className="site-nav__user site-nav__user--muted">…</span>
+            <span className="site-nav__user site-nav__user--muted">
+              …
+            </span>
           ) : isAuthenticated ? (
             <>
-              <span className="site-nav__user" title={user.email || user.username}>
+              <span
+                className="site-nav__user"
+                title={user.email || user.username}
+              >
                 {user.email || user.username}
               </span>
+
               <button
                 type="button"
                 className="btn btn--ghost btn--small"
@@ -80,10 +81,17 @@ function Layout() {
             </>
           ) : (
             <>
-              <Link to="/login" className="site-nav__link site-nav__link--cta">
+              <Link
+                to="/login"
+                className="site-nav__link site-nav__link--cta"
+              >
                 Sign in
               </Link>
-              <Link to="/register" className="btn btn--primary btn--small">
+
+              <Link
+                to="/register"
+                className="btn btn--primary btn--small"
+              >
                 Register
               </Link>
             </>
@@ -103,7 +111,10 @@ function Layout() {
             <div className="klaus-panel__topbar-title">
               <span aria-hidden="true">🧐</span>
               <span>Ask Klaus</span>
-              <span className="badge badge--medium" style={{ fontSize: "0.65rem" }}>
+              <span
+                className="badge badge--medium"
+                style={{ fontSize: "0.65rem" }}
+              >
                 AI
               </span>
             </div>
@@ -127,9 +138,11 @@ function Layout() {
       <button
         type="button"
         className={`klaus-fab${klausOpen ? " klaus-fab--active" : ""}`}
-        aria-label={klausOpen ? "Close Klaus" : "Open Klaus visualization assistant"}
+        aria-label={
+          klausOpen ? "Close Klaus" : "Open Klaus visualization assistant"
+        }
         aria-expanded={klausOpen}
-        onClick={() => setKlausOpen((v) => !v)}
+        onClick={() => setKlausOpen((value) => !value)}
       >
         <span className="klaus-fab__icon" aria-hidden="true">
           {klausOpen ? "✕" : "🧐"}

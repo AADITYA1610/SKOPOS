@@ -1,3 +1,4 @@
+from src.stream_api import router as stream_router
 from contextlib import asynccontextmanager
 import os
 import json
@@ -31,6 +32,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+app.include_router(stream_router)
 
 _cors = os.environ.get("CORS_ALLOW_ORIGINS", "http://localhost:5173")
 _cors_origins = [o.strip() for o in _cors.split(",") if o.strip()]
